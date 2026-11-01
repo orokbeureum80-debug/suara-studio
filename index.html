@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#10131d" />
+  <title>Suara Studio — Text to Speech</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10131d;
+      --panel: #191e2b;
+      --panel-2: #202738;
+      --line: rgba(255,255,255,.09);
+      --muted: #9ba6ba;
+      --text: #f5f7fb;
+      --accent: #8b7cff;
+      --accent-2: #b0a6ff;
+      --cyan: #58d6c7;
+      --danger: #ff8b9c;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--text);
+      background: radial-gradient(ellipse at 12% 0%, rgba(114,96,255,.19), transparent 35%),
+                  radial-gradient(ellipse at 92% 16%, rgba(57,202,188,.10), transparent 28%), var(--bg);
+    }
+    .shell { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 34px 0 54px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:28px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .brand-mark { width:44px; height:44px; display:grid; place-items:center; border-radius:14px; background:linear-gradient(145deg,#9d8fff,#6554dd); box-shadow:0 10px 35px rgba(116,97,255,.28); }
+    .brand-mark svg { width:24px; height:24px; }
+    .brand-name { font-size:16px; font-weight:800; letter-spacing:.02em; }
+    .brand-sub { color:var(--muted); font-size:12px; margin-top:2px; }
+    .top-pill { color:#b6f4e9; background:rgba(88,214,199,.10); border:1px solid rgba(88,214,199,.22); padding:8px 12px; border-radius:999px; font-size:12px; white-space:nowrap; }
+    .hero { margin-bottom:24px; }
+    .eyebrow { color:var(--accent-2); text-transform:uppercase; font-size:11px; font-weight:800; letter-spacing:.16em; margin-bottom:10px; }
+    h1 { font-size:clamp(29px,5vw,46px); line-height:1.08; letter-spacing:-.045em; margin:0; }
+    .hero p { color:var(--muted); margin:12px 0 0; max-width:680px; line-height:1.65; font-size:14px; }
+    .workspace { display:grid; grid-template-columns:minmax(0,1.18fr) minmax(300px,.82fr); gap:18px; align-items:start; }
+    .panel { background:linear-gradient(180deg,rgba(31,38,55,.96),rgba(24,29,42,.96)); border:1px solid var(--line); border-radius:22px; padding:22px; box-shadow:0 22px 60px rgba(0,0,0,.18); }
+    .panel-heading { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+    .step { width:27px; height:27px; display:grid; place-items:center; border-radius:9px; color:#d7d1ff; background:rgba(139,124,255,.16); font-size:12px; font-weight:800; }
+    h2 { font-size:15px; margin:0; letter-spacing:.01em; }
+    .field { margin-bottom:17px; }
+    label { display:block; color:#dbe1ee; font-size:12px; font-weight:700; margin-bottom:8px; }
+    select, textarea { width:100%; color:var(--text); background:#121725; border:1px solid rgba(255,255,255,.12); border-radius:12px; outline:none; transition:border .18s, box-shadow .18s; }
+    select { height:46px; padding:0 13px; font:inherit; font-size:13px; }
+    textarea { min-height:255px; resize:vertical; padding:15px; font:inherit; font-size:14px; line-height:1.7; }
+    select:focus, textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(139,124,255,.12); }
+    textarea::placeholder { color:#758198; }
+    .field-row { display:grid; grid-template-columns:1fr 1fr; gap:13px; }
+    .hint-row { display:flex; justify-content:space-between; gap:10px; margin-top:8px; color:var(--muted); font-size:11px; }
+    .counter { color:#c4baff; font-variant-numeric:tabular-nums; }
+    .voice-note { color:var(--muted); font-size:11px; line-height:1.5; margin-top:7px; }
+    .mood-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+    .mood-option { position:relative; }
+    .mood-option input { position:absolute; opacity:0; pointer-events:none; }
+    .mood-option span { min-height:42px; display:flex; align-items:center; justify-content:center; padding:8px 6px; border:1px solid rgba(255,255,255,.10); background:#141a28; color:#c0c8d8; border-radius:11px; font-size:11px; cursor:pointer; transition:.18s; }
+    .mood-option input:checked + span { color:#fff; border-color:rgba(139,124,255,.8); background:rgba(139,124,255,.16); box-shadow:inset 0 0 0 1px rgba(139,124,255,.18); }
+    .mood-option span:hover { border-color:rgba(255,255,255,.25); }
+    .generate-btn { width:100%; min-height:50px; border:0; border-radius:13px; color:white; font:inherit; font-size:14px; font-weight:800; cursor:pointer; background:linear-gradient(105deg,#7565ed,#9a7cff); box-shadow:0 12px 26px rgba(115,97,237,.24); transition:transform .16s, filter .16s; display:flex; align-items:center; justify-content:center; gap:10px; }
+    .generate-btn:hover { filter:brightness(1.08); transform:translateY(-1px); }
+    .generate-btn:disabled { opacity:.62; cursor:wait; transform:none; }
+    .spinner { width:16px; height:16px; border:2px solid rgba(255,255,255,.35); border-top-color:white; border-radius:50%; animation:spin .8s linear infinite; display:none; }
+    .loading .spinner { display:block; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .result-panel { position:sticky; top:18px; }
+    .wave-art { height:160px; border-radius:16px; background:radial-gradient(ellipse at center,rgba(139,124,255,.18),transparent 70%),#131a29; display:flex; align-items:center; justify-content:center; gap:5px; overflow:hidden; margin-bottom:18px; }
+    .wave-art i { width:4px; border-radius:6px; background:linear-gradient(180deg,#74dfd0,#9887ff); height:var(--h); opacity:.85; }
+    .wave-art.idle i { opacity:.35; }
+    .result-title { font-size:13px; font-weight:800; margin-bottom:5px; }
+    .result-desc { color:var(--muted); font-size:11px; line-height:1.55; margin-bottom:16px; }
+    audio { width:100%; height:42px; margin:3px 0 13px; display:none; }
+    .download-btn { width:100%; text-decoration:none; display:flex; justify-content:center; align-items:center; min-height:46px; border-radius:12px; background:rgba(88,214,199,.12); border:1px solid rgba(88,214,199,.28); color:#a9f1e6; font-size:13px; font-weight:800; gap:9px; }
+    .download-btn.disabled { opacity:.38; pointer-events:none; }
+    .status { min-height:20px; margin-top:12px; color:var(--muted); font-size:11px; line-height:1.5; }
+    .status.error { color:var(--danger); }
+    .mini-info { border-top:1px solid var(--line); margin-top:18px; padding-top:15px; color:var(--muted); font-size:11px; line-height:1.65; }
+    .mini-info strong { color:#dbe3f2; }
+    .footer-note { margin-top:17px; color:#7f8ba2; font-size:10px; line-height:1.6; text-align:center; }
+    @media (max-width:820px) { .workspace { grid-template-columns:1fr; } .result-panel { position:static; } .wave-art { height:125px; } }
+    @media (max-width:520px) { .shell { width:calc(100% - 20px); padding-top:20px; } header { margin-bottom:23px; } .panel { padding:17px; border-radius:18px; } .field-row { grid-template-columns:1fr; gap:0; } textarea { min-height:220px; } .mood-grid { grid-template-columns:repeat(2,1fr); } .top-pill { font-size:10px; padding:7px 9px; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"><path d="M3 10v4M7 6v12M11 3v18M15 7v10M19 10v4M22 11v2"/></svg>
+        </div>
+        <div><div class="brand-name">SUARA STUDIO</div><div class="brand-sub">Text to speech workspace</div></div>
+      </div>
+      <div class="top-pill">● Indonesia & Sunda</div>
+    </header>
+
+    <section class="hero">
+      <div class="eyebrow">Ubah tulisan menjadi suara</div>
+      <h1>Narasi Anda, jadi <span style="color:#a99cff">suara.</span></h1>
+      <p>Pilih bahasa, karakter suara, dan suasana penyampaian. Tempel naskah panjang, buat audio, lalu dengarkan atau simpan hasilnya sebagai WAV.</p>
+    </section>
+
+    <section class="workspace">
+      <div class="panel">
+        <div class="panel-heading"><div class="step">01</div><h2>Atur suara narasi</h2></div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="language">BAHASA</label>
+            <select id="language">
+              <option value="id">Bahasa Indonesia</option>
+              <option value="su">Bahasa Sunda</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="voice">KARAKTER SUARA</label>
+            <select id="voice"></select>
+            <div class="voice-note" id="voiceNote">Pilih karakter suara pria atau wanita.</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>EMOSI / VIBE SUARA</label>
+          <div class="mood-grid" role="radiogroup" aria-label="Pilih vibe suara">
+            <label class="mood-option"><input type="radio" name="vibe" value="natural" checked><span>Natural</span></label>
+            <label class="mood-option"><input type="radio" name="vibe" value="ceria"><span>☀ Ceria</span></label>
+            <label class="mood-option"><input type="radio" name="vibe" value="sedih"><span>☂ Sedih</span></label>
+            <label class="mood-option"><input type="radio" name="vibe" value="puitis"><span>✧ Puitis</span></label>
+            <label class="mood-option"><input type="radio" name="vibe" value="semangat"><span>⚡ Semangat</span></label>
+            <label class="mood-option"><input type="radio" name="vibe" value="tenang"><span>◌ Tenang</span></label>
+            <label class="mood-option"><input type="radio" name="vibe" value="tegas"><span>◆ Tegas</span></label>
+          </div>
+          <div class="voice-note">Vibe mengatur tempo, tinggi nada, volume, dan jeda melalui prosodi suara.</div>
+        </div>
+
+        <div class="panel-heading" style="margin:23px 0 13px"><div class="step">02</div><h2>Tulis narasi Anda</h2></div>
+        <div class="field">
+          <textarea id="narration" spellcheck="true" placeholder="Tempel atau tulis narasi Anda di sini...&#10;&#10;Teks panjang akan diproses otomatis dalam beberapa bagian."></textarea>
+          <div class="hint-row"><span>Tanpa batas karakter pada kolom teks</span><span class="counter" id="charCount">0 karakter</span></div>
+        </div>
+
+        <button class="generate-btn" id="generateBtn" type="button">
+          <span class="spinner" aria-hidden="true"></span>
+          <span id="generateLabel">Buat audio WAV</span>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg>
+        </button>
+      </div>
+
+      <aside class="panel result-panel">
+        <div class="panel-heading"><div class="step">03</div><h2>Hasil audio</h2></div>
+        <div class="wave-art idle" id="waveArt" aria-label="Visualisasi gelombang audio">
+          <i style="--h:20%"></i><i style="--h:38%"></i><i style="--h:55%"></i><i style="--h:34%"></i><i style="--h:72%"></i><i style="--h:90%"></i><i style="--h:58%"></i><i style="--h:36%"></i><i style="--h:75%"></i><i style="--h:48%"></i><i style="--h:26%"></i><i style="--h:62%"></i><i style="--h:84%"></i><i style="--h:40%"></i><i style="--h:24%"></i><i style="--h:58%"></i><i style="--h:76%"></i><i style="--h:32%"></i><i style="--h:50%"></i><i style="--h:70%"></i><i style="--h:30%"></i><i style="--h:18%"></i>
+        </div>
+        <div class="result-title" id="resultTitle">Belum ada audio</div>
+        <div class="result-desc" id="resultDesc">Audio yang selesai dibuat akan muncul di sini dan siap diputar.</div>
+        <audio id="audioPlayer" controls preload="metadata"></audio>
+        <a id="downloadLink" class="download-btn disabled" href="#" download="narasi.wav">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg>
+          Unduh file WAV
+        </a>
+        <div id="status" class="status" role="status" aria-live="polite">Siap membuat narasi pertama Anda.</div>
+        <div class="mini-info"><strong>Format audio</strong><br>WAV · PCM 16-bit · Mono · 24 kHz<br><br><strong>Catatan naskah panjang</strong><br>Sistem membagi teks menjadi beberapa bagian secara otomatis, lalu menggabungkan audionya menjadi satu file WAV.</div>
+      </aside>
+    </section>
+    <div class="footer-note">Suara Studio · Dibutuhkan koneksi internet dan konfigurasi Azure Speech API pada server.</div>
+  </main>
+
+  <script>
+    const voices = {
+      id: [
+        { id: 'id-ID-GadisNeural', label: 'Gadis — Wanita', note: 'Natural dan ramah' },
+        { id: 'id-ID-ArdiNeural', label: 'Ardi — Pria', note: 'Natural dan tegas' },
+        { id: 'id-ID-Cahya:MAI-Voice-2-Flash', label: 'Cahya — Pria', note: 'Karakter suara alternatif' },
+        { id: 'id-ID-Sari:MAI-Voice-2-Flash', label: 'Sari — Wanita', note: 'Karakter suara alternatif' }
+      ],
+      su: [
+        { id: 'su-ID-JajangNeural', label: 'Jajang — Pria', note: 'Suara Bahasa Sunda' },
+        { id: 'su-ID-TutiNeural', label: 'Tuti — Wanita', note: 'Suara Bahasa Sunda' }
+      ]
+    };
+
+    const languageEl = document.getElementById('language');
+    const voiceEl = document.getElementById('voice');
+    const voiceNote = document.getElementById('voiceNote');
+    const narrationEl = document.getElementById('narration');
+    const charCount = document.getElementById('charCount');
+    const generateBtn = document.getElementById('generateBtn');
+    const generateLabel = document.getElementById('generateLabel');
+    const statusEl = document.getElementById('status');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultDesc = document.getElementById('resultDesc');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const downloadLink = document.getElementById('downloadLink');
+    const waveArt = document.getElementById('waveArt');
+    let currentObjectUrl = null;
+
+    function populateVoices() {
+      const selectedLanguage = languageEl.value;
+      voiceEl.innerHTML = '';
+      for (const voice of voices[selectedLanguage]) {
+        const option = document.createElement('option');
+        option.value = voice.id;
+        option.textContent = voice.label;
+        option.dataset.note = voice.note;
+        voiceEl.appendChild(option);
+      }
+      voiceNote.textContent = voiceEl.selectedOptions[0]?.dataset.note || '';
+    }
+
+    languageEl.addEventListener('change', populateVoices);
+    voiceEl.addEventListener('change', () => {
+      voiceNote.textContent = voiceEl.selectedOptions[0]?.dataset.note || '';
+    });
+    narrationEl.addEventListener('input', () => {
+      charCount.textContent = `${narrationEl.value.length.toLocaleString('id-ID')} karakter`;
+    });
+
+    function selectedVibe() {
+      return document.querySelector('input[name="vibe"]:checked')?.value || 'natural';
+    }
+
+    function setLoading(isLoading) {
+      generateBtn.disabled = isLoading;
+      generateBtn.classList.toggle('loading', isLoading);
+      generateLabel.textContent = isLoading ? 'Sedang membuat audio...' : 'Buat audio WAV';
+      waveArt.classList.toggle('idle', !isLoading);
+    }
+
+    generateBtn.addEventListener('click', async () => {
+      const text = narrationEl.value.trim();
+      if (!text) {
+        statusEl.textContent = 'Kolom narasi masih kosong. Tulis teks terlebih dahulu.';
+        statusEl.className = 'status error';
+        narrationEl.focus();
+        return;
+      }
+
+      setLoading(true);
+      statusEl.className = 'status';
+      statusEl.textContent = 'Mengirim narasi dan memproses bagian-bagian audio...';
+      resultTitle.textContent = 'Sedang membuat audio';
+      resultDesc.textContent = `${text.length.toLocaleString('id-ID')} karakter sedang disintesis.`;
+
+      try {
+        const response = await fetch('/api/synthesize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            language: languageEl.value,
+            voice: voiceEl.value,
+            vibe: selectedVibe()
+          })
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || `Permintaan gagal (HTTP ${response.status}).`);
+        }
+
+        const audioBlob = await response.blob();
+        if (!audioBlob.size) throw new Error('File audio yang diterima kosong.');
+        if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+        currentObjectUrl = URL.createObjectURL(audioBlob);
+        audioPlayer.src = currentObjectUrl;
+        audioPlayer.style.display = 'block';
+        downloadLink.href = currentObjectUrl;
+        downloadLink.download = languageEl.value === 'su' ? 'narasi-bahasa-sunda.wav' : 'narasi-bahasa-indonesia.wav';
+        downloadLink.classList.remove('disabled');
+        resultTitle.textContent = 'Audio berhasil dibuat';
+        resultDesc.textContent = `WAV siap diputar · ${(audioBlob.size / 1024 / 1024).toFixed(2)} MB · ${text.length.toLocaleString('id-ID')} karakter.`;
+        statusEl.textContent = 'Selesai. Putar audio atau unduh file WAV ke perangkat Anda.';
+        statusEl.className = 'status';
+        waveArt.classList.remove('idle');
+      } catch (error) {
+        resultTitle.textContent = 'Audio belum tersedia';
+        resultDesc.textContent = 'Periksa konfigurasi server, koneksi internet, dan kredensial layanan suara.';
+        statusEl.textContent = error.message;
+        statusEl.className = 'status error';
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    populateVoices();
+  </script>
+</body>
+</html>
