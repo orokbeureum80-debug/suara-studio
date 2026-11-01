@@ -1,0 +1,13 @@
+{
+  "name": "suara-studio-tts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Aplikasi text-to-speech Bahasa Indonesia dan Sunda dengan output WAV.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
