@@ -1,9 +1,9 @@
 {
   "name": "suara-studio-tts",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Aplikasi text-to-speech Bahasa Indonesia dan Sunda dengan output WAV.",
+  "description": "Aplikasi text-to-speech Bahasa Indonesia dan uji coba Sunda menggunakan ElevenLabs",
   "scripts": {
     "start": "node server.js"
   },
