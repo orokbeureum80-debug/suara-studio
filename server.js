@@ -28,51 +28,28 @@ async function loadEnvFile() {
   }
 }
 
-// Voice IDs resmi Azure Speech. Client tidak boleh mengirim ID suara sembarang.
+// Hanya dua suara yang dipilih untuk Suara Studio.
 const VOICES = {
-  id: {
-    locale: 'id-ID',
-    voices: {
-      'id-ID-GadisNeural': { label: 'Gadis', gender: 'Female', description: 'Wanita · natural dan ramah' },
-      'id-ID-ArdiNeural': { label: 'Ardi', gender: 'Male', description: 'Pria · natural dan tegas' },
-      'id-ID-Cahya:MAI-Voice-2-Flash': { label: 'Cahya', gender: 'Male', description: 'Pria · karakter suara alternatif' },
-      'id-ID-Sari:MAI-Voice-2-Flash': { label: 'Sari', gender: 'Female', description: 'Wanita · karakter suara alternatif' }
-    }
-  },
-  su: {
-    locale: 'su-ID',
-    voices: {
-      'su-ID-JajangNeural': { label: 'Jajang', gender: 'Male', description: 'Pria · Bahasa Sunda' },
-      'su-ID-TutiNeural': { label: 'Tuti', gender: 'Female', description: 'Wanita · Bahasa Sunda' }
-    }
-  }
+  'hpp4J3VqNfWAUOO0d1Us': { label: 'Bella', gender: 'Wanita' },
+  'JBFqnCBsd6RMkjVDRZzb': { label: 'George', gender: 'Pria' }
 };
 
-// Vibe diterapkan sebagai arahan prosodi SSML, bukan filter audio pascaproses.
+// Vibe mengatur speed, stability, dan style pada permintaan ElevenLabs.
+// Rentang speed yang didukung API adalah 0.7 sampai 1.2.
 const VIBES = {
-  natural: { rate: '0%', pitch: '0%', volume: '0dB', pause: false },
-  ceria: { rate: '+8%', pitch: '+7%', volume: '+1dB', pause: false },
-  sedih: { rate: '-10%', pitch: '-6%', volume: '-2dB', pause: false },
-  puitis: { rate: '-7%', pitch: '+1%', volume: '-1dB', pause: true },
-  semangat: { rate: '+12%', pitch: '+5%', volume: '+1dB', pause: false },
-  tenang: { rate: '-5%', pitch: '-1%', volume: '-1dB', pause: true },
-  tegas: { rate: '-1%', pitch: '-2%', volume: '+1dB', pause: false }
+  natural:  { speed: 1.00, stability: 0.55, style: 0.00 },
+  ceria:    { speed: 1.08, stability: 0.35, style: 0.25 },
+  sedih:    { speed: 0.88, stability: 0.65, style: 0.10 },
+  puitis:   { speed: 0.92, stability: 0.45, style: 0.20 },
+  semangat: { speed: 1.12, stability: 0.30, style: 0.30 },
+  tenang:   { speed: 0.90, stability: 0.72, style: 0.05 },
+  tegas:    { speed: 0.98, stability: 0.78, style: 0.05 }
 };
 
-function escapeXml(value) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;');
-}
-
-// Memecah naskah pada batas kalimat/paragraf agar permintaan TTS tetap kecil.
-// Tidak ada maxlength di UI; teks panjang diproses berurutan di backend.
-function splitText(text, maxChars = 1800) {
+function splitText(text, maxChars = 4500) {
   let rest = text.trim();
   const chunks = [];
+
   while (rest.length > maxChars) {
     const sample = rest.slice(0, maxChars + 1);
     const minCut = Math.floor(maxChars * 0.55);
@@ -98,41 +75,9 @@ function splitText(text, maxChars = 1800) {
     if (part) chunks.push(part);
     rest = rest.slice(cut).trim();
   }
+
   if (rest) chunks.push(rest);
   return chunks;
-}
-
-function makeSsml(text, locale, voiceId, vibe) {
-  const profile = VIBES[vibe];
-  let safeText = escapeXml(text);
-  if (profile.pause) safeText = safeText.replace(/\r?\n+/g, '<break time="320ms"/>');
-
-  const gender = voiceId.includes('Jajang') || voiceId.includes('Ardi') || voiceId.includes('Cahya') ? 'Male' : 'Female';
-  return `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="${locale}">` +
-    `<voice name="${voiceId}" xml:lang="${locale}" xml:gender="${gender}">` +
-    `<prosody rate="${profile.rate}" pitch="${profile.pitch}" volume="${profile.volume}">${safeText}</prosody>` +
-    `</voice></speak>`;
-}
-
-function createWavFromPcm(pcm, sampleRate = 24000, channels = 1, bitsPerSample = 16) {
-  const header = Buffer.alloc(44);
-  const byteRate = sampleRate * channels * bitsPerSample / 8;
-  const blockAlign = channels * bitsPerSample / 8;
-  header.write('RIFF', 0);
-  header.writeUInt32LE(36 + pcm.length, 4);
-  header.write('WAVE', 8);
-  header.write('fmt ', 12);
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(1, 20);
-  header.writeUInt16LE(channels, 22);
-  header.writeUInt32LE(sampleRate, 24);
-  header.writeUInt32LE(byteRate, 28);
-  header.writeUInt16LE(blockAlign, 32);
-  header.writeUInt16LE(bitsPerSample, 34);
-  header.write('data', 36);
-  header.writeUInt32LE(pcm.length, 40);
-  return Buffer.concat([header, pcm]);
 }
 
 function sendJson(res, statusCode, data) {
@@ -149,91 +94,133 @@ function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     const parts = [];
     let size = 0;
+    let tooLarge = false;
+
     req.on('data', (part) => {
       size += part.length;
       if (size > MAX_BODY_BYTES) {
-        reject(Object.assign(new Error('Ukuran narasi melewati batas permintaan server (30 MB).'), { statusCode: 413 }));
+        tooLarge = true;
+        reject(Object.assign(new Error('Ukuran narasi melewati batas server (30 MB).'), { statusCode: 413 }));
         req.destroy();
         return;
       }
       parts.push(part);
     });
+
     req.on('end', () => {
+      if (tooLarge) return;
       try {
         resolve(JSON.parse(Buffer.concat(parts).toString('utf8')));
       } catch {
         reject(Object.assign(new Error('Format data permintaan tidak valid.'), { statusCode: 400 }));
       }
     });
+
     req.on('error', reject);
   });
 }
 
 async function synthesize(body, res) {
   const { text, language, voice, vibe = 'natural' } = body ?? {};
-  if (typeof text !== 'string' || !text.trim()) return sendJson(res, 400, { error: 'Tuliskan narasi terlebih dahulu.' });
-  if (!['id', 'su'].includes(language)) return sendJson(res, 400, { error: 'Bahasa tidak dikenali.' });
-  if (!VIBES[vibe]) return sendJson(res, 400, { error: 'Pilihan vibe tidak dikenali.' });
 
-  const languageConfig = VOICES[language];
-  if (!Object.hasOwn(languageConfig.voices, voice)) {
-    return sendJson(res, 400, { error: 'Karakter suara tidak tersedia untuk bahasa tersebut.' });
+  if (typeof text !== 'string' || !text.trim()) {
+    return sendJson(res, 400, { error: 'Tuliskan narasi terlebih dahulu.' });
+  }
+  if (!['id', 'su'].includes(language)) {
+    return sendJson(res, 400, { error: 'Bahasa tidak dikenali.' });
+  }
+  if (!Object.hasOwn(VIBES, vibe)) {
+    return sendJson(res, 400, { error: 'Pilihan vibe tidak dikenali.' });
+  }
+  if (!Object.hasOwn(VOICES, voice)) {
+    return sendJson(res, 400, { error: 'Karakter suara tidak tersedia.' });
   }
 
-  const speechKey = process.env.AZURE_SPEECH_KEY;
-  const region = process.env.AZURE_SPEECH_REGION;
-  if (!speechKey || !region) {
-    return sendJson(res, 503, { error: 'Server belum dikonfigurasi. Isi AZURE_SPEECH_KEY dan AZURE_SPEECH_REGION di file .env.' });
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) {
+    return sendJson(res, 503, {
+      error: 'Server belum dikonfigurasi. Pastikan ELEVENLABS_API_KEY sudah diisi pada Environment Variables Render.'
+    });
   }
 
   const chunks = splitText(text);
-  const pcmParts = [];
-  const endpoint = `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`;
+  const audioParts = [];
+  const settings = VIBES[vibe];
 
   for (let i = 0; i < chunks.length; i += 1) {
-    const ssml = makeSsml(chunks[i], languageConfig.locale, voice, vibe);
+    const endpoint = `https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_22050_32`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120_000);
+
     let response;
     try {
       response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'Ocp-Apim-Subscription-Key': speechKey,
-          'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': 'raw-24khz-16bit-mono-pcm',
-          'User-Agent': 'SuaraStudioTTS/1.0'
+          'xi-api-key': apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'audio/mpeg'
         },
-        body: ssml,
+        body: JSON.stringify({
+          text: chunks[i],
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: {
+            stability: settings.stability,
+            similarity_boost: 0.75,
+            style: settings.style,
+            use_speaker_boost: true,
+            speed: settings.speed
+          }
+        }),
         signal: controller.signal
       });
+    } catch (error) {
+      const message = error.name === 'AbortError'
+        ? 'Permintaan ke ElevenLabs melewati batas waktu.'
+        : 'Tidak dapat terhubung ke layanan ElevenLabs.';
+      return sendJson(res, 503, { error: `${message} (bagian ${i + 1} dari ${chunks.length}).` });
     } finally {
       clearTimeout(timeout);
     }
 
     if (!response.ok) {
-      const providerMessage = (await response.text()).slice(0, 500);
-      const status = response.status;
-      return sendJson(res, status >= 400 && status < 500 ? 502 : 503, {
-        error: `Layanan suara gagal pada bagian ${i + 1} dari ${chunks.length}. ${providerMessage || `HTTP ${status}`}`
-      });
+      const providerMessage = (await response.text()).slice(0, 700);
+      let explanation = providerMessage;
+      try {
+        const parsed = JSON.parse(providerMessage);
+        explanation = parsed.detail?.message || parsed.detail?.status || parsed.message || providerMessage;
+      } catch {
+        // Gunakan pesan asli jika respons bukan JSON.
+      }
+
+      let message = `ElevenLabs gagal memproses bagian ${i + 1} dari ${chunks.length}.`;
+      if (response.status === 401) message += ' API Key tidak valid atau tidak memiliki izin.';
+      else if (response.status === 403) message += ' Akses ke suara ini ditolak atau dibatasi oleh akun.';
+      else if (response.status === 429) message += ' Batas penggunaan atau kredit akun mungkin sudah tercapai.';
+      else if (response.status === 400 || response.status === 422) message += ' Parameter atau format permintaan tidak diterima.';
+      if (explanation) message += ` Detail: ${explanation}`;
+      return sendJson(res, 502, { error: message });
     }
 
-    const pcm = Buffer.from(await response.arrayBuffer());
-    if (!pcm.length) return sendJson(res, 502, { error: `Layanan suara mengembalikan audio kosong pada bagian ${i + 1}.` });
-    pcmParts.push(pcm);
+    const audio = Buffer.from(await response.arrayBuffer());
+    if (!audio.length) {
+      return sendJson(res, 502, { error: `ElevenLabs mengembalikan audio kosong pada bagian ${i + 1}.` });
+    }
+    audioParts.push(audio);
   }
 
-  const wav = createWavFromPcm(Buffer.concat(pcmParts));
+  // Segmen MP3 digabung berurutan menjadi satu respons MP3.
+  const mp3 = Buffer.concat(audioParts);
   const safeBaseName = language === 'su' ? 'narasi-bahasa-sunda' : 'narasi-bahasa-indonesia';
+
   res.writeHead(200, {
-    'Content-Type': 'audio/wav',
-    'Content-Length': wav.length,
-    'Content-Disposition': `attachment; filename="${safeBaseName}.wav"`,
-    'X-Audio-Sample-Rate': '24000',
+    'Content-Type': 'audio/mpeg',
+    'Content-Length': mp3.length,
+    'Content-Disposition': `attachment; filename="${safeBaseName}.mp3"`,
+    'X-Audio-Format': 'MP3 22.05 kHz 32 kbps',
     'Cache-Control': 'no-store'
   });
-  res.end(wav);
+  res.end(mp3);
 }
 
 const MIME_TYPES = {
@@ -246,15 +233,24 @@ const MIME_TYPES = {
 };
 
 async function serveStatic(urlPath, res) {
-  const decodedPath = decodeURIComponent(urlPath);
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(urlPath);
+  } catch {
+    return sendJson(res, 400, { error: 'Alamat file tidak valid.' });
+  }
+
   const relativePath = decodedPath === '/' ? 'index.html' : decodedPath.replace(/^\/+/, '');
   const filePath = path.resolve(PUBLIC_DIR, relativePath);
+
   if (!filePath.startsWith(PUBLIC_DIR + path.sep) && filePath !== path.join(PUBLIC_DIR, 'index.html')) {
     return sendJson(res, 403, { error: 'Akses file ditolak.' });
   }
+
   try {
     const fileStat = await stat(filePath);
     if (!fileStat.isFile()) return sendJson(res, 404, { error: 'File tidak ditemukan.' });
+
     res.writeHead(200, {
       'Content-Type': MIME_TYPES[path.extname(filePath)] || 'application/octet-stream',
       'Content-Length': fileStat.size,
@@ -269,27 +265,34 @@ async function serveStatic(urlPath, res) {
 
 await loadEnvFile();
 const PORT = Number(process.env.PORT || 3000);
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+
     if (req.method === 'GET' && url.pathname === '/api/health') {
       return sendJson(res, 200, {
         ok: true,
-        configured: Boolean(process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION)
+        configured: Boolean(process.env.ELEVENLABS_API_KEY)
       });
     }
+
     if (req.method === 'POST' && url.pathname === '/api/synthesize') {
       const body = await readJsonBody(req);
       return await synthesize(body, res);
     }
+
     if (req.method === 'GET' && !url.pathname.startsWith('/api/')) {
       return await serveStatic(url.pathname, res);
     }
+
     return sendJson(res, 404, { error: 'Endpoint tidak ditemukan.' });
   } catch (error) {
     console.error('Server error:', error);
     if (!res.headersSent && !res.destroyed) {
-      sendJson(res, error.statusCode || 500, { error: error.message || 'Terjadi kesalahan pada server.' });
+      sendJson(res, error.statusCode || 500, {
+        error: error.message || 'Terjadi kesalahan pada server.'
+      });
     }
   }
 });
